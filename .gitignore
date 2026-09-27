@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+build/
+.npm-cache/
+
+# Built by scripts/build-llama.sh: shipped in the npm package, not in git
+ios/Frameworks/
+# Debug symbols from the same build, for the GitHub release
+dist/

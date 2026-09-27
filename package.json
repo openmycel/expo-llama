@@ -1,0 +1,56 @@
+{
+  "name": "@openmycel/expo-llama",
+  "version": "0.1.0",
+  "description": "Run GGUF language models on iPhone with llama.cpp — an Expo native module in Swift.",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "react-native": "src/index.ts",
+  "source": "src/index.ts",
+  "files": [
+    "build",
+    "src",
+    "ios/*.swift",
+    "ios/*.podspec",
+    "ios/Frameworks/llama.xcframework",
+    "ios/Frameworks/LLAMA_VERSION",
+    "expo-module.config.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf build",
+    "typecheck": "tsc --noEmit",
+    "prepare": "tsc",
+    "build:llama": "scripts/build-llama.sh",
+    "prepublishOnly": "tsc"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "llama.cpp",
+    "gguf",
+    "llm",
+    "ios"
+  ],
+  "repository": "https://github.com/openmycel/expo-llama",
+  "bugs": {
+    "url": "https://github.com/openmycel/expo-llama/issues"
+  },
+  "homepage": "https://github.com/openmycel/expo-llama#readme",
+  "author": "The OpenMycel Authors",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "expo": "57.0.25",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "typescript": "6.0.3"
+  },
+  "peerDependencies": {
+    "expo": ">=57.0.0",
+    "react": "*",
+    "react-native": ">=0.86.0"
+  }
+}
