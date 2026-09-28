@@ -1,6 +1,6 @@
 {
   "name": "@openmycel/expo-llama",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Run GGUF language models on iPhone with llama.cpp — an Expo native module in Swift.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -13,6 +13,7 @@
     "ios/*.podspec",
     "ios/Frameworks/llama.xcframework",
     "ios/Frameworks/LLAMA_VERSION",
+    "ios/Frameworks/LICENSE-llama.cpp",
     "expo-module.config.json"
   ],
   "scripts": {

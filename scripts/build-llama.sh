@@ -30,6 +30,8 @@ rm -rf "$OUT"
 mkdir -p "$ROOT/ios/Frameworks" "$ROOT/dist"
 cp -R build-apple/llama.xcframework "$OUT"
 echo "$TAG $COMMIT" > "$ROOT/ios/Frameworks/LLAMA_VERSION"
+# MIT asks for the notice in every copy: the license travels with the binary.
+cp LICENSE "$ROOT/ios/Frameworks/LICENSE-llama.cpp"
 
 # Debug symbols are ~170 of ~195 MB. They stay out of the npm package and go to
 # dist/ as a separate zip for crash symbolication (attached to the GitHub release).

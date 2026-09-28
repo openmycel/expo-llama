@@ -136,7 +136,8 @@ the bundle holds one copy of each; TypeScript needs `preserveSymlinks`. See
 
 ## Credits
 
-[llama.cpp](https://github.com/ggml-org/llama.cpp) by the ggml authors, MIT. Module layout from
+[llama.cpp](https://github.com/ggml-org/llama.cpp) by the ggml authors, MIT; the package ships
+its license next to the framework, `ios/Frameworks/LICENSE-llama.cpp`. Module layout from
 Expo's `expo-module-template`, MIT.
 
 ## Author and license
