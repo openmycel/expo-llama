@@ -102,6 +102,8 @@ struct GenerateOptions: Record {
   @Field var minP: Double = 0.05
   @Field var presencePenalty: Double = 0
   @Field var seed: Int?
+  // GBNF with a "root" rule; the output can only be what it allows.
+  @Field var grammar: String?
 }
 
 final class ModelNotFoundException: GenericException<String> {
@@ -122,6 +124,10 @@ final class ModelNotLoadedException: Exception {
 
 final class ChatTemplateException: Exception {
   override var reason: String { "The model has no chat template llama.cpp can apply" }
+}
+
+final class GrammarException: Exception {
+  override var reason: String { "llama.cpp could not parse the grammar (GBNF, needs a root rule)" }
 }
 
 final class TokenizeException: Exception {

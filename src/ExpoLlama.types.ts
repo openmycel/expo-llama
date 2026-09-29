@@ -33,6 +33,11 @@ export type GenerateOptions = {
   /** Penalizes tokens already used in the last 64; 0 = off. Default 0. */
   presencePenalty?: number;
   seed?: number;
+  /**
+   * GBNF grammar (llama.cpp's format) with a `root` rule: the answer can only be text the
+   * grammar allows, e.g. one JSON shape. Rejects the call if the grammar does not parse.
+   */
+  grammar?: string;
 };
 
 export type GenerateResult = {

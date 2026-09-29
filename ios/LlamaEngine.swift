@@ -137,7 +137,7 @@ final class LlamaEngine {
     }
     let promptEnd = DispatchTime.now()
 
-    let sampler = makeSampler(options, vocab: vocab)
+    let sampler = try makeSampler(options, vocab: vocab)
     defer { llama_sampler_free(sampler) }
 
     var text = ""
@@ -192,8 +192,16 @@ final class LlamaEngine {
 
   private func makeSampler(
     _ options: GenerateOptions, vocab: OpaquePointer?
-  ) -> UnsafeMutablePointer<llama_sampler> {
+  ) throws -> UnsafeMutablePointer<llama_sampler> {
     let chain = llama_sampler_chain_init(llama_sampler_chain_default_params())!
+    // First in the chain: tokens the grammar forbids never reach the other samplers.
+    if let grammar = options.grammar, !grammar.isEmpty {
+      guard let constraint = llama_sampler_init_grammar(vocab, grammar, "root") else {
+        llama_sampler_free(chain)
+        throw GrammarException()
+      }
+      llama_sampler_chain_add(chain, constraint)
+    }
     if options.presencePenalty != 0 {
       // Last 64 tokens, as in llama.cpp's own defaults.
       llama_sampler_chain_add(
