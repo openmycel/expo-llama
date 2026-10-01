@@ -52,6 +52,23 @@ export function sha256File(path: string): Promise<string> {
   return ExpoLlama.sha256File(path);
 }
 
+/**
+ * Stops the running sha256File: it rejects with `HashCancelledException` within one 4 MB
+ * chunk. One hash runs at a time.
+ */
+export function cancelSha256File(): void {
+  ExpoLlama.cancelSha256File();
+}
+
+/**
+ * Called when iOS warns that memory is low (UIApplication.didReceiveMemoryWarningNotification):
+ * the moment to `unload()` before the app is killed. Returns the unsubscribe.
+ */
+export function onMemoryWarning(listener: () => void): () => void {
+  const sub = ExpoLlama.addListener("onMemoryWarning", listener);
+  return () => sub.remove();
+}
+
 /** Keeps a downloaded model out of iCloud and device backups. */
 export function excludeFromBackup(path: string): void {
   ExpoLlama.excludeFromBackup(path);

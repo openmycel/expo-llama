@@ -17,6 +17,11 @@ declare class ExpoLlamaModule extends NativeModule<ExpoLlamaEvents> {
   unload(): Promise<void>;
   isLoaded(): Promise<boolean>;
   sha256File(path: string): Promise<string>;
+  cancelSha256File(): void;
+  addListener<K extends keyof ExpoLlamaEvents>(
+    event: K,
+    listener: ExpoLlamaEvents[K]
+  ): { remove(): void };
   excludeFromBackup(path: string): void;
   checkSource(url: string): Promise<SourceCheck>;
 }

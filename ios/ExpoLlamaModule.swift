@@ -1,12 +1,24 @@
 import ExpoModulesCore
+import UIKit
 
 public class ExpoLlamaModule: Module {
   private let engine = LlamaEngine()
+  // Set by cancelSha256File, read by the running hash before each chunk. One hash at a time.
+  private var hashCancelled = false
 
   public func definition() -> ModuleDefinition {
     Name("ExpoLlama")
 
-    Events("onToken")
+    Events("onToken", "onMemoryWarning")
+
+    // iOS warns the app in the foreground before it kills it; the app unloads the model.
+    OnCreate {
+      NotificationCenter.default.addObserver(
+        forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
+      ) { [weak self] _ in
+        self?.sendEvent("onMemoryWarning", [:])
+      }
+    }
 
     AsyncFunction("loadModel") { (path: String, options: LoadOptions, promise: Promise) in
       self.engine.queue.async {
@@ -50,13 +62,20 @@ public class ExpoLlamaModule: Module {
     }
 
     AsyncFunction("sha256File") { (path: String, promise: Promise) in
+      self.hashCancelled = false
       DispatchQueue.global(qos: .utility).async {
         do {
-          promise.resolve(try ModelFiles.sha256(path: filePath(path)))
+          promise.resolve(
+            try ModelFiles.sha256(path: filePath(path), isCancelled: { self.hashCancelled }))
         } catch {
           promise.reject(error)
         }
       }
+    }
+
+    // The running sha256File rejects with HashCancelledException within one chunk.
+    Function("cancelSha256File") {
+      self.hashCancelled = true
     }
 
     Function("excludeFromBackup") { (path: String) throws in
@@ -68,6 +87,7 @@ public class ExpoLlamaModule: Module {
     }
 
     OnDestroy {
+      NotificationCenter.default.removeObserver(self)
       self.engine.requestStop()
       self.engine.queue.sync { self.engine.unload() }
     }
@@ -116,6 +136,10 @@ final class ModelLoadException: GenericException<String> {
 
 final class ContextException: GenericException<Int> {
   override var reason: String { "Could not create a context of \(param) tokens: not enough memory?" }
+}
+
+final class HashCancelledException: Exception {
+  override var reason: String { "The hash was cancelled." }
 }
 
 final class ModelNotLoadedException: Exception {

@@ -57,6 +57,8 @@ export type TokenEvent = {
 
 export type ExpoLlamaEvents = {
   onToken: (event: TokenEvent) => void;
+  /** iOS is low on memory: unload the model before the app is killed. */
+  onMemoryWarning: () => void;
 };
 
 export type SourceCheck = {

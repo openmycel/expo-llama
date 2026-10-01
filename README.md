@@ -60,11 +60,13 @@ pass the whole history each time.
 | `unload()` / `isLoaded()`               | Frees the model and context / reports whether one is loaded.                                                                                                                                                                                                                                                                                               |
 | `sha256File(path)`                      | SHA-256 of a file as lowercase hex, read in 4 MB chunks with CryptoKit — a 3 GB model never sits in memory.                                                                                                                                                                                                                                                |
 | `checkSource(url)`                      | One `HEAD` request (ephemeral session, no cookies) and why it failed: `offline`, `unreachable` (DNS, TLS, timeout, HTTP 403/451 — what a block looks like) or `http`.                                                                                                                                                                                      |
+| `cancelSha256File()`                    | Stops the running `sha256File`; it rejects with `HashCancelledException` within one chunk.                                                                                                                                                                                                                                                                 |
+| `onMemoryWarning(listener)`             | iOS says memory is low: `unload()` now, before the app is killed. Returns the unsubscribe.                                                                                                                                                                                                                                                                 |
 | `excludeFromBackup(path)`               | Keeps a re-downloadable model out of iCloud and device backups.                                                                                                                                                                                                                                                                                            |
 
 Errors are thrown as typed exceptions with a readable message: `ModelNotFoundException`,
 `ModelLoadException`, `ContextException`, `ModelNotLoadedException`, `ChatTemplateException`,
-`PromptTooLongException`, `DecodeException`.
+`PromptTooLongException`, `DecodeException`, `HashCancelledException`.
 
 ## Architecture
 
