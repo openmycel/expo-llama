@@ -22,7 +22,9 @@
     "typecheck": "tsc --noEmit",
     "prepare": "tsc",
     "build:llama": "scripts/build-llama.sh",
-    "prepublishOnly": "tsc"
+    "prepublishOnly": "tsc",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [
     "react-native",
@@ -45,6 +47,7 @@
   "devDependencies": {
     "@types/react": "19.2.18",
     "expo": "57.0.25",
+    "prettier": "3.9.9",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "typescript": "6.0.3"
