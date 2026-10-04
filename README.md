@@ -78,6 +78,7 @@ history each time; the session's cache saves reading it again ([Sessions](#sessi
 | `seed`            | random  |                                                                                      |
 | `grammar`         | —       | GBNF with a `root` rule: the answer can only be what it allows, e.g. one JSON shape. |
 | `session`         | `""`    | The context to run in, made on first use ([Sessions](#sessions)).                    |
+| `contextSize`     | load's  | The session's context size in tokens ([Sessions](#sessions)).                        |
 
 The result: `text`, `promptTokens`, `cachedTokens` (of them, taken from the session's cache),
 `tokens`, `stopped`, `promptMs`, `generationMs`, `tokensPerSecond`.
@@ -97,16 +98,16 @@ Use one session per kind of prompt, so they do not overwrite each other's cache:
 `""` for the chat, `"router"` for a fixed instruction asked again and again. Calls in different
 sessions still run one at a time, on the same queue.
 
-Each session costs memory: its KV cache is sized for the full `contextSize` of `loadModel`,
-made when the session is first used. For an f16 cache that is
-`2 × layers × KV heads × head size × 2 bytes` per token of context. `unload()` frees all of
-them; there is no way to free one.
+Each session costs memory: its KV cache is allocated for its whole context when the session
+is first used — for an f16 cache, `2 × layers × KV heads × head size × 2 bytes` per token.
+By default that is the `contextSize` of `loadModel`; a session that only reads short prompts
+can ask for less with the `contextSize` option of `generate`. Asked with another size than it
+has, the session is made again and its cache is lost. `unload()` frees all sessions; there is
+no way to free one.
 
 ## What it does not do
 
 - **Android.** iOS only; Android is planned in the same module.
-- **A context size per session.** Every session gets the load's `contextSize`, even one that
-  only ever reads a short prompt.
 - **Freeing one session.** Only `unload()`, which frees the model and all of them.
 - **Two generations at once.** One queue: a second `generate` waits for the first.
 - **Keeping the cache across launches.** A session's cache lives in memory until `unload()`.

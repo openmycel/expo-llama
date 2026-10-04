@@ -47,6 +47,13 @@ export type GenerateOptions = {
    * other's cache. Default "".
    */
   session?: string;
+  /**
+   * The session's context size in tokens: its KV cache is allocated for all of them, so a
+   * session that only reads short prompts can take less memory than the chat. Asked with
+   * another size than the session has, the session is made again and its cache is lost.
+   * Default: the `contextSize` of `loadModel`.
+   */
+  contextSize?: number;
 };
 
 export type GenerateResult = {

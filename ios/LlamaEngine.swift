@@ -9,9 +9,14 @@ private var lastLogLevel = GGML_LOG_LEVEL_NONE
 // so the next prompt that starts the same way is read only from where it differs.
 private final class Session {
   let context: OpaquePointer
+  /// The context size it was asked for; llama.cpp may round what it allocates.
+  let size: Int
   /// The tokens in the KV cache of sequence 0, in order.
   var cached: [llama_token] = []
-  init(_ context: OpaquePointer) { self.context = context }
+  init(_ context: OpaquePointer, size: Int) {
+    self.context = context
+    self.size = size
+  }
 }
 
 // One model at a time, and a context per session on it ("" is the default one). Every call
@@ -95,7 +100,7 @@ final class LlamaEngine {
 
     self.model = model
     self.contextParams = contextParams
-    sessions[""] = Session(context)
+    sessions[""] = Session(context, size: options.contextSize)
 
     var desc = [CChar](repeating: 0, count: 256)
     llama_model_desc(model, &desc, desc.count)
@@ -114,14 +119,22 @@ final class LlamaEngine {
     model = nil
   }
 
-  // The named session, made on first use with the load's context parameters: the weights
-  // are shared, only the KV cache is its own.
-  private func sessionNamed(_ name: String) throws -> Session {
-    if let session = sessions[name] { return session }
-    guard let model, let context = llama_init_from_model(model, contextParams) else {
-      throw ContextException(Int(contextParams.n_ctx))
+  // The named session, made on first use with the load's context parameters and `size`
+  // tokens of context (the load's `contextSize` when nil): the weights are shared, only the
+  // KV cache is its own. Asked with another size, it is made again and its cache is lost.
+  private func sessionNamed(_ name: String, size: Int?) throws -> Session {
+    guard let model else { throw ModelNotLoadedException() }
+    var params = contextParams
+    if let size { params.n_ctx = UInt32(size) }
+    if let session = sessions[name] {
+      if session.size == Int(params.n_ctx) { return session }
+      llama_free(session.context)
+      sessions[name] = nil
     }
-    let session = Session(context)
+    guard let context = llama_init_from_model(model, params) else {
+      throw ContextException(Int(params.n_ctx))
+    }
+    let session = Session(context, size: Int(params.n_ctx))
     sessions[name] = session
     return session
   }
@@ -135,7 +148,7 @@ final class LlamaEngine {
     onText: (String) -> Void
   ) throws -> [String: Any] {
     guard let model else { throw ModelNotLoadedException() }
-    let session = try sessionNamed(options.session ?? "")
+    let session = try sessionNamed(options.session ?? "", size: options.contextSize)
     let context = session.context
     resetStop()
 

@@ -126,6 +126,8 @@ struct GenerateOptions: Record {
   @Field var grammar: String?
   // A context of its own on the model, with its own cache of the last prompt.
   @Field var session: String?
+  // The session's context size in tokens; nil = the load's contextSize.
+  @Field var contextSize: Int?
 }
 
 final class ModelNotFoundException: GenericException<String> {
