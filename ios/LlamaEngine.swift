@@ -5,13 +5,24 @@ import llama
 // continue it and are filtered the same way.
 private var lastLogLevel = GGML_LOG_LEVEL_NONE
 
-// One model and one context at a time. Every call runs on `queue`, so load, generate
-// and unload never overlap; only `requestStop` crosses threads, guarded by `stopLock`.
+// A context of its own on the loaded model, by name: its KV cache keeps what it last read,
+// so the next prompt that starts the same way is read only from where it differs.
+private final class Session {
+  let context: OpaquePointer
+  /// The tokens in the KV cache of sequence 0, in order.
+  var cached: [llama_token] = []
+  init(_ context: OpaquePointer) { self.context = context }
+}
+
+// One model at a time, and a context per session on it ("" is the default one). Every call
+// runs on `queue`, so load, generate and unload never overlap; only `requestStop` crosses
+// threads, guarded by `stopLock`.
 final class LlamaEngine {
   let queue = DispatchQueue(label: "org.openmycel.expo-llama", qos: .userInitiated)
 
   private var model: OpaquePointer?
-  private var context: OpaquePointer?
+  private var contextParams = llama_context_default_params()
+  private var sessions: [String: Session] = [:]
   private let stopLock = NSLock()
   private var stopRequested = false
 
@@ -33,7 +44,7 @@ final class LlamaEngine {
     unload()
   }
 
-  var isLoaded: Bool { context != nil }
+  var isLoaded: Bool { model != nil }
 
   func requestStop() {
     stopLock.lock()
@@ -83,7 +94,8 @@ final class LlamaEngine {
     }
 
     self.model = model
-    self.context = context
+    self.contextParams = contextParams
+    sessions[""] = Session(context)
 
     var desc = [CChar](repeating: 0, count: 256)
     llama_model_desc(model, &desc, desc.count)
@@ -96,20 +108,35 @@ final class LlamaEngine {
   }
 
   func unload() {
-    if let context { llama_free(context) }
+    for session in sessions.values { llama_free(session.context) }
+    sessions = [:]
     if let model { llama_model_free(model) }
-    context = nil
     model = nil
   }
 
+  // The named session, made on first use with the load's context parameters: the weights
+  // are shared, only the KV cache is its own.
+  private func sessionNamed(_ name: String) throws -> Session {
+    if let session = sessions[name] { return session }
+    guard let model, let context = llama_init_from_model(model, contextParams) else {
+      throw ContextException(Int(contextParams.n_ctx))
+    }
+    let session = Session(context)
+    sessions[name] = session
+    return session
+  }
+
   // Formats `messages` with the model's own chat template, then samples until an
-  // end-of-generation token, `maxTokens`, a full context or `requestStop`.
+  // end-of-generation token, `maxTokens`, a full context or `requestStop`. In the session
+  // `options.session`, the part of the prompt its cache already holds is not read again.
   func generate(
     messages: [ChatMessage],
     options: GenerateOptions,
     onText: (String) -> Void
   ) throws -> [String: Any] {
-    guard let model, let context else { throw ModelNotLoadedException() }
+    guard let model else { throw ModelNotLoadedException() }
+    let session = try sessionNamed(options.session ?? "")
+    let context = session.context
     resetStop()
 
     let vocab = llama_model_get_vocab(model)
@@ -121,12 +148,22 @@ final class LlamaEngine {
       throw PromptTooLongException((tokens.count, contextSize))
     }
 
-    // Each call is a fresh conversation: the whole history comes in `messages`.
-    llama_memory_clear(llama_get_memory(context), true)
+    // The whole history comes in `messages`; what the cache holds of its start stays. At
+    // least the last token is read again: its logits start the answer.
+    let memory = llama_get_memory(context)
+    var reused = 0
+    let limit = min(session.cached.count, tokens.count - 1)
+    while reused < limit, session.cached[reused] == tokens[reused] { reused += 1 }
+    if reused == 0 || !llama_memory_seq_rm(memory, 0, llama_pos(reused), -1) {
+      llama_memory_clear(memory, true)
+      reused = 0
+    }
+    // Until the prompt is read, the cache holds only what is kept: an error leaves it true.
+    session.cached = Array(tokens.prefix(reused))
 
     let promptStart = DispatchTime.now()
     let batchSize = Int(llama_n_batch(context))
-    var offset = 0
+    var offset = reused
     while offset < tokens.count {
       let count = min(batchSize, tokens.count - offset)
       let status = tokens.withUnsafeMutableBufferPointer { buffer in
@@ -135,6 +172,7 @@ final class LlamaEngine {
       guard status == 0 else { throw DecodeException(status) }
       offset += count
     }
+    session.cached = tokens
     let promptEnd = DispatchTime.now()
 
     let sampler = try makeSampler(options, vocab: vocab)
@@ -169,6 +207,7 @@ final class LlamaEngine {
       generated += 1
       let status = llama_decode(context, llama_batch_get_one(&token, 1))
       guard status == 0 else { throw DecodeException(status) }
+      session.cached.append(token)
     }
     if !pending.isEmpty {
       let chunk = String(decoding: pending, as: UTF8.self)
@@ -182,6 +221,7 @@ final class LlamaEngine {
     return [
       "text": text,
       "promptTokens": tokens.count,
+      "cachedTokens": reused,
       "tokens": generated,
       "stopped": stopped,
       "promptMs": promptMs,

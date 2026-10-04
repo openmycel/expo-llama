@@ -38,11 +38,22 @@ export type GenerateOptions = {
    * grammar allows, e.g. one JSON shape. Rejects the call if the grammar does not parse.
    */
   grammar?: string;
+  /**
+   * A context of its own on the loaded model, made on first use: the weights are shared,
+   * the KV cache is its own. Each session keeps what it last read, so a prompt that starts
+   * the same way as the one before (the same system prompt, a longer chat) is read only
+   * from where it differs. Use one per kind of prompt — "router" for a fixed instruction
+   * asked again and again, the default "" for the chat — so they do not overwrite each
+   * other's cache. Default "".
+   */
+  session?: string;
 };
 
 export type GenerateResult = {
   text: string;
   promptTokens: number;
+  /** Tokens of the prompt taken from the session's cache, not read again. */
+  cachedTokens: number;
   tokens: number;
   /** True when `stop()` ended the generation. */
   stopped: boolean;

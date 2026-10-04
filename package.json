@@ -1,6 +1,6 @@
 {
   "name": "@openmycel/expo-llama",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Run GGUF language models on iPhone with llama.cpp — an Expo native module in Swift.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -46,11 +46,11 @@
   },
   "devDependencies": {
     "@types/react": "19.2.18",
-    "expo": "57.0.25",
+    "expo": "57.0.26",
     "prettier": "3.9.9",
     "react": "19.2.3",
     "react-native": "0.86.3",
-    "typescript": "6.0.3"
+    "typescript": "7.0.2"
   },
   "peerDependencies": {
     "expo": ">=57.0.0",

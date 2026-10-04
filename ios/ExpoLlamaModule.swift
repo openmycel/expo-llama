@@ -124,6 +124,8 @@ struct GenerateOptions: Record {
   @Field var seed: Int?
   // GBNF with a "root" rule; the output can only be what it allows.
   @Field var grammar: String?
+  // A context of its own on the model, with its own cache of the last prompt.
+  @Field var session: String?
 }
 
 final class ModelNotFoundException: GenericException<String> {
