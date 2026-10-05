@@ -27,6 +27,9 @@ final class LlamaEngine {
 
   private var model: OpaquePointer?
   private var contextParams = llama_context_default_params()
+  // A second model of its own, for vectors (an embedding model), and its context.
+  private var embedder: OpaquePointer?
+  private var embedContext: OpaquePointer?
   private var sessions: [String: Session] = [:]
   private let stopLock = NSLock()
   private var stopRequested = false
@@ -47,6 +50,7 @@ final class LlamaEngine {
 
   deinit {
     unload()
+    unloadEmbedder()
   }
 
   var isLoaded: Bool { model != nil }
@@ -117,6 +121,120 @@ final class LlamaEngine {
     sessions = [:]
     if let model { llama_model_free(model) }
     model = nil
+  }
+
+  // An embedding model next to the chat model: its own weights and one context that pools
+  // each text into one vector. The whole text goes in one batch (n_batch = n_ubatch =
+  // contextSize): an encoder such as BERT reads it at once, not in pieces.
+  func loadEmbedder(path: String, options: EmbedderOptions) throws -> [String: Any] {
+    unloadEmbedder()
+    guard FileManager.default.fileExists(atPath: path) else {
+      throw ModelNotFoundException(path)
+    }
+    var modelParams = llama_model_default_params()
+    #if targetEnvironment(simulator)
+    modelParams.n_gpu_layers = 0
+    #else
+    modelParams.n_gpu_layers = Int32(options.gpuLayers)
+    #endif
+    guard let model = llama_model_load_from_file(path, modelParams) else {
+      throw ModelLoadException(path)
+    }
+    var params = llama_context_default_params()
+    params.embeddings = true
+    params.n_ctx = UInt32(options.contextSize)
+    params.n_batch = UInt32(options.contextSize)
+    params.n_ubatch = UInt32(options.contextSize)
+    params.pooling_type = options.pooling.flatMap { Self.pooling[$0] } ?? LLAMA_POOLING_TYPE_UNSPECIFIED
+    // Few threads: a short text needs little, and the chat model keeps the rest.
+    let threads = Int32(max(1, min(options.threads, ProcessInfo.processInfo.activeProcessorCount - 2)))
+    params.n_threads = threads
+    params.n_threads_batch = threads
+    guard let context = llama_init_from_model(model, params) else {
+      llama_model_free(model)
+      throw ContextException(options.contextSize)
+    }
+    guard llama_pooling_type(context) != LLAMA_POOLING_TYPE_NONE else {
+      llama_free(context)
+      llama_model_free(model)
+      throw PoolingException()
+    }
+    embedder = model
+    embedContext = context
+    var desc = [CChar](repeating: 0, count: 256)
+    llama_model_desc(model, &desc, desc.count)
+    return [
+      "description": String(cString: desc),
+      "sizeBytes": Double(llama_model_size(model)),
+      "parameters": Double(llama_model_n_params(model)),
+      "contextSize": Int(llama_n_ctx(context)),
+      "dimensions": Int(llama_model_n_embd(model)),
+    ]
+  }
+
+  private static let pooling: [String: llama_pooling_type] = [
+    "mean": LLAMA_POOLING_TYPE_MEAN, "cls": LLAMA_POOLING_TYPE_CLS, "last": LLAMA_POOLING_TYPE_LAST,
+  ]
+
+  var isEmbedderLoaded: Bool { embedder != nil }
+
+  func unloadEmbedder() {
+    if let embedContext { llama_free(embedContext) }
+    if let embedder { llama_model_free(embedder) }
+    embedContext = nil
+    embedder = nil
+  }
+
+  // One vector per text, each of unit length, so a dot product is the cosine. A text longer
+  // than the context is cut to it.
+  func embed(texts: [String]) throws -> [String: Any] {
+    guard let model = embedder, let context = embedContext else {
+      throw EmbedderNotLoadedException()
+    }
+    let started = DispatchTime.now()
+    let vocab = llama_model_get_vocab(model)
+    let size = Int(llama_n_ctx(context))
+    let dimensions = Int(llama_model_n_embd(model))
+    let encoder = llama_model_has_encoder(model) && !llama_model_has_decoder(model)
+    var vectors: [[Double]] = []
+    var tokenCount = 0
+    for text in texts {
+      // The model's own BOS and EOS: some pool on the last token, which must be EOS.
+      let bytes = Int32(text.utf8.count)
+      var tokens = [llama_token](repeating: 0, count: Int(bytes) + 8)
+      var count = llama_tokenize(vocab, text, bytes, &tokens, Int32(tokens.count), true, false)
+      if count < 0 {
+        tokens = [llama_token](repeating: 0, count: Int(-count))
+        count = llama_tokenize(vocab, text, bytes, &tokens, Int32(tokens.count), true, false)
+      }
+      guard count >= 0 else { throw TokenizeException() }
+      let n = min(Int(count), size)
+      tokenCount += n
+
+      llama_memory_clear(llama_get_memory(context), true)
+      var batch = llama_batch_init(Int32(n), 0, 1)
+      defer { llama_batch_free(batch) }
+      for i in 0..<n {
+        batch.token[i] = tokens[i]
+        batch.pos[i] = llama_pos(i)
+        batch.n_seq_id[i] = 1
+        batch.seq_id[i]![0] = 0
+        batch.logits[i] = 1
+      }
+      batch.n_tokens = Int32(n)
+      let status = encoder ? llama_encode(context, batch) : llama_decode(context, batch)
+      guard status == 0 else { throw DecodeException(status) }
+      guard let pooled = llama_get_embeddings_seq(context, 0) else { throw PoolingException() }
+      var norm = 0.0
+      for d in 0..<dimensions { norm += Double(pooled[d]) * Double(pooled[d]) }
+      norm = norm > 0 ? norm.squareRoot() : 1
+      vectors.append((0..<dimensions).map { Double(pooled[$0]) / norm })
+    }
+    return [
+      "vectors": vectors,
+      "tokens": tokenCount,
+      "ms": milliseconds(started, DispatchTime.now()),
+    ]
   }
 
   // The named session, made on first use with the load's context parameters and `size`

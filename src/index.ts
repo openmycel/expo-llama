@@ -1,6 +1,9 @@
 import ExpoLlama from './ExpoLlamaModule'
 import type {
 	ChatMessage,
+	EmbedderInfo,
+	EmbedderOptions,
+	Embeddings,
 	GenerateOptions,
 	GenerateResult,
 	LoadOptions,
@@ -48,6 +51,34 @@ export function unload(): Promise<void> {
 
 export function isLoaded(): Promise<boolean> {
 	return ExpoLlama.isLoaded()
+}
+
+/**
+ * Loads an embedding model (GGUF) next to the chat model: both stay in memory, each with its
+ * own weights. Replaces the embedding model loaded before.
+ */
+export function loadEmbedder(
+	path: string,
+	options: EmbedderOptions = {},
+): Promise<EmbedderInfo> {
+	return ExpoLlama.loadEmbedder(path, options)
+}
+
+/**
+ * Vectors of `texts` from the embedding model, one per text, each of unit length. A model
+ * that wants a prefix or an instruction (e5's "query: ", Qwen3-Embedding's "Instruct: …")
+ * gets it in the text.
+ */
+export function embed(texts: string[]): Promise<Embeddings> {
+	return ExpoLlama.embed(texts)
+}
+
+export function unloadEmbedder(): Promise<void> {
+	return ExpoLlama.unloadEmbedder()
+}
+
+export function isEmbedderLoaded(): Promise<boolean> {
+	return ExpoLlama.isEmbedderLoaded()
 }
 
 /** SHA-256 of a file (path or file:// URI) as lowercase hex, computed natively in chunks. */

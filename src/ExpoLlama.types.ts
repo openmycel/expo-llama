@@ -12,6 +12,36 @@ export type LoadOptions = {
 	gpuLayers?: number
 }
 
+export type EmbedderOptions = {
+	/** Tokens one text may have; a longer text is cut. Default 512. */
+	contextSize?: number
+	/** Layers offloaded to the GPU (Metal); -1 = all. Default -1. CPU only in the Simulator. */
+	gpuLayers?: number
+	/**
+	 * How the tokens' vectors become one: `mean`, `cls` or `last` — what the model's card
+	 * says (Qwen3-Embedding: `last`, e5: `mean`). Default: what the model file says.
+	 */
+	pooling?: 'mean' | 'cls' | 'last'
+	/**
+	 * CPU threads it computes on; the chat model keeps the others. Default 2: a short text
+	 * needs few, and the two models do not fight for the cores.
+	 */
+	threads?: number
+}
+
+export type EmbedderInfo = ModelInfo & {
+	/** The length of each vector. */
+	dimensions: number
+}
+
+export type Embeddings = {
+	/** One vector per text, in order, each of unit length: a dot product is the cosine. */
+	vectors: number[][]
+	/** Tokens read, all texts together. */
+	tokens: number
+	ms: number
+}
+
 export type ModelInfo = {
 	description: string
 	sizeBytes: number

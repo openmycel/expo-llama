@@ -53,17 +53,20 @@ history each time; the session's cache saves reading it again ([Sessions](#sessi
 
 ## API
 
-| Function                                | What it does                                                                                                                                                          |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `loadModel(path, options?)`             | Loads a GGUF file (path or `file://` URI), replacing the model loaded before. `contextSize` (default 4096), `gpuLayers` (default -1 = all on Metal).                  |
-| `generate(messages, options?, onText?)` | Answers the conversation; `onText` gets each piece of text. Options below.                                                                                            |
-| `stop()`                                | Ends a running `generate`; it resolves with `stopped: true`.                                                                                                          |
-| `unload()` / `isLoaded()`               | Frees the model and every session / reports whether a model is loaded.                                                                                                |
-| `sha256File(path)`                      | SHA-256 of a file as lowercase hex, read in 4 MB chunks with CryptoKit — a 3 GB model never sits in memory.                                                           |
-| `cancelSha256File()`                    | Stops the running `sha256File`; it rejects with `HashCancelledException` within one chunk.                                                                            |
-| `checkSource(url)`                      | One `HEAD` request (ephemeral session, no cookies) and why it failed: `offline`, `unreachable` (DNS, TLS, timeout, HTTP 403/451 — what a block looks like) or `http`. |
-| `onMemoryWarning(listener)`             | iOS says memory is low: `unload()` now, before the app is killed. Returns the unsubscribe.                                                                            |
-| `excludeFromBackup(path)`               | Keeps a re-downloadable model out of iCloud and device backups.                                                                                                       |
+| Function                                  | What it does                                                                                                                                                          |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `loadModel(path, options?)`               | Loads a GGUF file (path or `file://` URI), replacing the model loaded before. `contextSize` (default 4096), `gpuLayers` (default -1 = all on Metal).                  |
+| `generate(messages, options?, onText?)`   | Answers the conversation; `onText` gets each piece of text. Options below.                                                                                            |
+| `stop()`                                  | Ends a running `generate`; it resolves with `stopped: true`.                                                                                                          |
+| `unload()` / `isLoaded()`                 | Frees the model and every session / reports whether a model is loaded.                                                                                                |
+| `loadEmbedder(path, options?)`            | Loads an embedding model next to the chat model ([Embeddings](#embeddings)).                                                                                          |
+| `embed(texts)`                            | One vector per text, each of unit length: a dot product is the cosine.                                                                                                |
+| `unloadEmbedder()` / `isEmbedderLoaded()` | Frees the embedding model / reports whether one is loaded.                                                                                                            |
+| `sha256File(path)`                        | SHA-256 of a file as lowercase hex, read in 4 MB chunks with CryptoKit — a 3 GB model never sits in memory.                                                           |
+| `cancelSha256File()`                      | Stops the running `sha256File`; it rejects with `HashCancelledException` within one chunk.                                                                            |
+| `checkSource(url)`                        | One `HEAD` request (ephemeral session, no cookies) and why it failed: `offline`, `unreachable` (DNS, TLS, timeout, HTTP 403/451 — what a block looks like) or `http`. |
+| `onMemoryWarning(listener)`               | iOS says memory is low: `unload()` now, before the app is killed. Returns the unsubscribe.                                                                            |
+| `excludeFromBackup(path)`                 | Keeps a re-downloadable model out of iCloud and device backups.                                                                                                       |
 
 `generate` options; defaults are llama.cpp's own:
 
@@ -85,7 +88,8 @@ The result: `text`, `promptTokens`, `cachedTokens` (of them, taken from the sess
 
 Errors are thrown as typed exceptions with a readable message: `ModelNotFoundException`,
 `ModelLoadException`, `ContextException`, `ModelNotLoadedException`, `ChatTemplateException`,
-`PromptTooLongException`, `DecodeException`, `HashCancelledException`.
+`PromptTooLongException`, `DecodeException`, `HashCancelledException`,
+`EmbedderNotLoadedException`, `PoolingException`.
 
 ## Sessions
 
@@ -105,6 +109,31 @@ can ask for less with the `contextSize` option of `generate`. Asked with another
 has, the session is made again and its cache is lost. `unload()` frees all sessions; there is
 no way to free one.
 
+## Embeddings
+
+An embedding model turns a text into a vector; texts close in meaning get close vectors. Use it
+to find which of many items a message is about before the chat model reads them — for
+example, the few skills of hundreds that a message may be for.
+
+```ts
+import { embed, loadEmbedder } from '@openmycel/expo-llama'
+
+await loadEmbedder(fileUri, { pooling: 'last' })
+const { vectors } = await embed([
+	'Instruct: Given a message to a phone assistant, retrieve messages that ask the assistant for the same action\nQuery:Set a timer for 10 minutes',
+	'Start a countdown timer for a length of time.',
+])
+const cosine = vectors[0].reduce((s, x, i) => s + x * vectors[1][i], 0)
+```
+
+It is a second model with its own weights, loaded next to the chat model: both take memory
+at once. Options: `contextSize` — the tokens one text may have, a longer text is cut
+(default 512); `gpuLayers`; `threads` — CPU threads, default 2, so the two models do not
+fight for the cores; `pooling` — `mean`, `cls` or `last`, as the model's card says
+(default: what the GGUF file says). The result: `vectors`, `tokens`, `ms`. A prefix or an
+instruction the model expects (e5's `query: `, Qwen3-Embedding's `Instruct: …\nQuery:`) goes
+in the text. Calls run on the same queue as `generate`.
+
 ## What it does not do
 
 - **Android.** iOS only; Android is planned in the same module.
@@ -113,8 +142,10 @@ no way to free one.
 - **Keeping the cache across launches.** A session's cache lives in memory until `unload()`.
 - **Measured on an iPhone (0.3.0).** Sessions and the prompt cache are checked in the iOS
   Simulator, on the CPU. Speed and memory with Metal on a device are not measured yet.
-- **Embeddings, images, audio, LoRA adapters, tool calls.** Text in, text out; `grammar` is
+- **Images, audio, LoRA adapters, tool calls.** Text in, text or vectors out; `grammar` is
   the only way to shape the answer.
+- **Embeddings measured on an iPhone.** `embed` is checked in the iOS Simulator; speed and
+  memory of two models at once on a device are not measured yet.
 - **Downloading models.** The app downloads the file; the module checks it (`sha256File`,
   `checkSource`) and keeps it out of backups.
 

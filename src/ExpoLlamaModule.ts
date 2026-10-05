@@ -2,6 +2,9 @@ import { NativeModule, requireNativeModule } from 'expo'
 
 import type {
 	ChatMessage,
+	EmbedderInfo,
+	EmbedderOptions,
+	Embeddings,
 	ExpoLlamaEvents,
 	GenerateOptions,
 	GenerateResult,
@@ -19,6 +22,10 @@ declare class ExpoLlamaModule extends NativeModule<ExpoLlamaEvents> {
 	stop(): void
 	unload(): Promise<void>
 	isLoaded(): Promise<boolean>
+	loadEmbedder(path: string, options: EmbedderOptions): Promise<EmbedderInfo>
+	embed(texts: string[]): Promise<Embeddings>
+	unloadEmbedder(): Promise<void>
+	isEmbedderLoaded(): Promise<boolean>
 	sha256File(path: string): Promise<string>
 	cancelSha256File(): void
 	addListener<K extends keyof ExpoLlamaEvents>(

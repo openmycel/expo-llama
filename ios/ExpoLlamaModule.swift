@@ -61,6 +61,39 @@ public class ExpoLlamaModule: Module {
       }
     }
 
+    AsyncFunction("loadEmbedder") { (path: String, options: EmbedderOptions, promise: Promise) in
+      self.engine.queue.async {
+        do {
+          promise.resolve(try self.engine.loadEmbedder(path: filePath(path), options: options))
+        } catch {
+          promise.reject(error)
+        }
+      }
+    }
+
+    AsyncFunction("embed") { (texts: [String], promise: Promise) in
+      self.engine.queue.async {
+        do {
+          promise.resolve(try self.engine.embed(texts: texts))
+        } catch {
+          promise.reject(error)
+        }
+      }
+    }
+
+    AsyncFunction("unloadEmbedder") { (promise: Promise) in
+      self.engine.queue.async {
+        self.engine.unloadEmbedder()
+        promise.resolve()
+      }
+    }
+
+    AsyncFunction("isEmbedderLoaded") { (promise: Promise) in
+      self.engine.queue.async {
+        promise.resolve(self.engine.isEmbedderLoaded)
+      }
+    }
+
     AsyncFunction("sha256File") { (path: String, promise: Promise) in
       self.hashCancelled = false
       DispatchQueue.global(qos: .utility).async {
@@ -89,7 +122,10 @@ public class ExpoLlamaModule: Module {
     OnDestroy {
       NotificationCenter.default.removeObserver(self)
       self.engine.requestStop()
-      self.engine.queue.sync { self.engine.unload() }
+      self.engine.queue.sync {
+        self.engine.unload()
+        self.engine.unloadEmbedder()
+      }
     }
   }
 }
@@ -106,6 +142,16 @@ struct LoadOptions: Record {
   @Field var contextSize: Int = 4096
   // -1 offloads every layer to the GPU (Metal).
   @Field var gpuLayers: Int = -1
+}
+
+struct EmbedderOptions: Record {
+  // Tokens one text may have; longer texts are cut.
+  @Field var contextSize: Int = 512
+  @Field var gpuLayers: Int = -1
+  // "mean", "cls" or "last"; nil = what the model file says.
+  @Field var pooling: String?
+  // CPU threads; the chat model keeps the others.
+  @Field var threads: Int = 2
 }
 
 struct ChatMessage: Record {
@@ -148,6 +194,14 @@ final class HashCancelledException: Exception {
 
 final class ModelNotLoadedException: Exception {
   override var reason: String { "No model is loaded. Call loadModel first." }
+}
+
+final class EmbedderNotLoadedException: Exception {
+  override var reason: String { "No embedding model is loaded. Call loadEmbedder first." }
+}
+
+final class PoolingException: Exception {
+  override var reason: String { "The model pools no vector: pass pooling (\"mean\", \"cls\" or \"last\")" }
 }
 
 final class ChatTemplateException: Exception {
