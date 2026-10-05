@@ -1,6 +1,6 @@
 {
-  "platforms": ["apple"],
-  "apple": {
-    "modules": ["ExpoLlamaModule"]
-  }
+	"platforms": ["apple"],
+	"apple": {
+		"modules": ["ExpoLlamaModule"]
+	}
 }

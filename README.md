@@ -28,23 +28,23 @@ The llama.cpp engine ships inside the package as a ready `llama.xcframework` (8.
 ## Usage
 
 ```typescript
-import { generate, loadModel, stop, unload } from "@openmycel/expo-llama";
+import { generate, loadModel, stop, unload } from '@openmycel/expo-llama'
 
-const info = await loadModel(fileUri, { contextSize: 2048 });
+const info = await loadModel(fileUri, { contextSize: 2048 })
 // { description: "qwen3 0.6B Q8_0", parameters: 596049920, sizeBytes: 633495552, contextSize: 2048 }
 
 const result = await generate(
-  [
-    { role: "system", content: "Answer briefly." },
-    { role: "user", content: "Two ideas for a quick dinner?" },
-  ],
-  { temperature: 0.7, topP: 0.8, topK: 20, minP: 0, presencePenalty: 1.5 },
-  (piece) => console.log(piece) // streamed as it is generated
-);
+	[
+		{ role: 'system', content: 'Answer briefly.' },
+		{ role: 'user', content: 'Two ideas for a quick dinner?' },
+	],
+	{ temperature: 0.7, topP: 0.8, topK: 20, minP: 0, presencePenalty: 1.5 },
+	(piece) => console.log(piece), // streamed as it is generated
+)
 // { text, promptTokens, cachedTokens, tokens, stopped, promptMs, generationMs, tokensPerSecond }
 
-stop(); // from anywhere: the running generate resolves with what it has so far
-await unload();
+stop() // from anywhere: the running generate resolves with what it has so far
+await unload()
 ```
 
 The prompt is built with the model's own chat template (`llama_chat_apply_template`), so the

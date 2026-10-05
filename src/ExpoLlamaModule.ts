@@ -1,29 +1,32 @@
-import { NativeModule, requireNativeModule } from "expo";
+import { NativeModule, requireNativeModule } from 'expo'
 
 import type {
-  ChatMessage,
-  ExpoLlamaEvents,
-  GenerateOptions,
-  GenerateResult,
-  LoadOptions,
-  ModelInfo,
-  SourceCheck,
-} from "./ExpoLlama.types";
+	ChatMessage,
+	ExpoLlamaEvents,
+	GenerateOptions,
+	GenerateResult,
+	LoadOptions,
+	ModelInfo,
+	SourceCheck,
+} from './ExpoLlama.types'
 
 declare class ExpoLlamaModule extends NativeModule<ExpoLlamaEvents> {
-  loadModel(path: string, options: LoadOptions): Promise<ModelInfo>;
-  generate(messages: ChatMessage[], options: GenerateOptions): Promise<GenerateResult>;
-  stop(): void;
-  unload(): Promise<void>;
-  isLoaded(): Promise<boolean>;
-  sha256File(path: string): Promise<string>;
-  cancelSha256File(): void;
-  addListener<K extends keyof ExpoLlamaEvents>(
-    event: K,
-    listener: ExpoLlamaEvents[K]
-  ): { remove(): void };
-  excludeFromBackup(path: string): void;
-  checkSource(url: string): Promise<SourceCheck>;
+	loadModel(path: string, options: LoadOptions): Promise<ModelInfo>
+	generate(
+		messages: ChatMessage[],
+		options: GenerateOptions,
+	): Promise<GenerateResult>
+	stop(): void
+	unload(): Promise<void>
+	isLoaded(): Promise<boolean>
+	sha256File(path: string): Promise<string>
+	cancelSha256File(): void
+	addListener<K extends keyof ExpoLlamaEvents>(
+		event: K,
+		listener: ExpoLlamaEvents[K],
+	): { remove(): void }
+	excludeFromBackup(path: string): void
+	checkSource(url: string): Promise<SourceCheck>
 }
 
-export default requireNativeModule<ExpoLlamaModule>("ExpoLlama");
+export default requireNativeModule<ExpoLlamaModule>('ExpoLlama')
