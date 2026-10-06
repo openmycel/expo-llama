@@ -197,8 +197,10 @@ npm run build:llama   # scripts/build-llama.sh
 
 The script downloads the pinned tag (`b11146`, the build behind the `v0.5.0` release),
 refuses the archive unless `git get-tar-commit-id` matches the pinned commit, and runs
-llama.cpp's own `build-xcframework.sh ios-sim ios-device`. Needs Xcode and CMake; on an M3 Max
-it takes about 90 seconds.
+llama.cpp's own `build-xcframework.sh ios-sim ios-device`. The arm64 code is compiled for
+`armv8.2-a+dotprod+fp16` — the dot-product and half-precision instructions every iPhone
+since the A13 has, which ggml picks at compile time; the script refuses a binary without
+them. Needs Xcode and CMake; on an M3 Max it takes about 90 seconds.
 
 Output: `ios/Frameworks/llama.xcframework` (iPhone arm64 + simulator arm64/x86_64) — in the npm
 package, not in git. Debug symbols make up ~170 of ~195 MB, so they are split off into

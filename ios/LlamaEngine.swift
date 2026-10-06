@@ -1,6 +1,19 @@
 import Foundation
 import llama
 
+// The cores the engine computes on: the performance ones (sysctl hw.perflevel0.logicalcpu).
+// Every step of a generation waits for its slowest thread, so a thread on an efficiency
+// core slows the whole step: on an M3 Max 14 threads generated at half the speed of 6. At
+// least two; without the sysctl, all but two.
+private func performanceCores() -> Int32 {
+  var count: Int32 = 0
+  var size = MemoryLayout<Int32>.size
+  if sysctlbyname("hw.perflevel0.logicalcpu", &count, &size, nil, 0) == 0, count > 0 {
+    return max(2, count)
+  }
+  return Int32(max(2, ProcessInfo.processInfo.activeProcessorCount - 2))
+}
+
 // Level of the last llama.cpp log line: GGML_LOG_LEVEL_CONT lines (progress dots)
 // continue it and are filtered the same way.
 private var lastLogLevel = GGML_LOG_LEVEL_NONE
@@ -93,8 +106,7 @@ final class LlamaEngine {
 
     var contextParams = llama_context_default_params()
     contextParams.n_ctx = UInt32(options.contextSize)
-    // Leave two cores for the UI and the system.
-    let threads = Int32(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))
+    let threads = performanceCores()
     contextParams.n_threads = threads
     contextParams.n_threads_batch = threads
     guard let context = llama_init_from_model(model, contextParams) else {
@@ -147,7 +159,7 @@ final class LlamaEngine {
     params.n_ubatch = UInt32(options.contextSize)
     params.pooling_type = options.pooling.flatMap { Self.pooling[$0] } ?? LLAMA_POOLING_TYPE_UNSPECIFIED
     // Few threads: a short text needs little, and the chat model keeps the rest.
-    let threads = Int32(max(1, min(options.threads, ProcessInfo.processInfo.activeProcessorCount - 2)))
+    let threads = Int32(max(1, min(Int32(options.threads), performanceCores())))
     params.n_threads = threads
     params.n_threads_batch = threads
     guard let context = llama_init_from_model(model, params) else {
