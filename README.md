@@ -9,8 +9,8 @@ from iCloud backups.
 Built for [OpenMycel](https://github.com/openmycel/openmycel), a private assistant that works
 offline.
 
-**Status:** early. iOS only. Sessions (0.3.0) are measured in the iOS Simulator only, not yet
-on an iPhone — see [What it does not do](#what-it-does-not-do).
+**Status:** early. iOS only. Chat, sessions and embeddings are checked in the iOS Simulator;
+on an iPhone only the chat is — see [What it does not do](#what-it-does-not-do).
 
 ## Install
 
@@ -140,8 +140,9 @@ in the text. Calls run on the same queue as `generate`.
 - **Freeing one session.** Only `unload()`, which frees the model and all of them.
 - **Two generations at once.** One queue: a second `generate` waits for the first.
 - **Keeping the cache across launches.** A session's cache lives in memory until `unload()`.
-- **Measured on an iPhone (0.3.0).** Sessions and the prompt cache are checked in the iOS
-  Simulator, on the CPU. Speed and memory with Metal on a device are not measured yet.
+- **Measured on an iPhone.** Sessions, the prompt cache and the engine's arm64 code paths are
+  checked in the iOS Simulator, on the CPU. Speed and memory with Metal on a device are not
+  measured yet.
 - **Images, audio, LoRA adapters, tool calls.** Text in, text or vectors out; `grammar` is
   the only way to shape the answer.
 - **Embeddings measured on an iPhone.** `embed` is checked in the iOS Simulator; speed and
